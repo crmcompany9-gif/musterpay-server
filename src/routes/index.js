@@ -1,14 +1,18 @@
 const router = require('express').Router();
-const { requireAuth, login, me } = require('../auth');
+const { requireAuth, requireAdmin, login, me } = require('../auth');
+const { getMyPayslips } = require('../me');
 
 // public
 router.post('/auth/login', login);
-router.get('/auth/me', requireAuth, me);
 
-// protected
-router.use('/employees', requireAuth, require('./employees'));
-router.use('/attendance', requireAuth, require('./attendance'));
-router.use('/payroll', requireAuth, require('./payroll'));
-router.use('/policy', requireAuth, require('./policy'));
+// any signed-in user
+router.get('/auth/me', requireAuth, me);
+router.get('/me/payslips', requireAuth, getMyPayslips);
+
+// admin only (HR)
+router.use('/employees', requireAuth, requireAdmin, require('./employees'));
+router.use('/attendance', requireAuth, requireAdmin, require('./attendance'));
+router.use('/payroll', requireAuth, requireAdmin, require('./payroll'));
+router.use('/policy', requireAuth, requireAdmin, require('./policy'));
 
 module.exports = router;
