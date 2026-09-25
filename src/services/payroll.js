@@ -9,11 +9,10 @@ const isSundayUTC = (year, month, day) => new Date(Date.UTC(year, month - 1, day
 
 function perDayRate(salary, year, month, method) {
   if (method === 'fixed30') return salary / 30;
-  const d = daysInMonth(year, month); // 'calendar' (default): divide by actual days
+  const d = daysInMonth(year, month);
   return d > 0 ? salary / d : 0;
 }
 
-// policy: { absentWeight, halfWeight, shortWeight, freePaidLeavesPerMonth, perDayMethod }
 function computeEmployeePayroll({ employee, year, month, attendanceRecords = [], holidayDates = [], policy }) {
   const nDays = daysInMonth(year, month);
   const perDay = perDayRate(employee.monthlySalary, year, month, policy.perDayMethod);
@@ -21,12 +20,22 @@ function computeEmployeePayroll({ employee, year, month, attendanceRecords = [],
     employee.freePaidLeavesPerMonth != null ? employee.freePaidLeavesPerMonth : policy.freePaidLeavesPerMonth;
   const wA = policy.absentWeight, wH = policy.halfWeight, wS = policy.shortWeight;
 
+  let preJoinCutoff = 0;
+  const jd = employee.joinDate ? new Date(employee.joinDate) : null;
+  if (jd && !isNaN(jd.getTime())) {
+    const jy = jd.getUTCFullYear(), jm = jd.getUTCMonth() + 1, jday = jd.getUTCDate();
+    if (jy > year || (jy === year && jm > month)) preJoinCutoff = nDays;
+    else if (jy === year && jm === month) preJoinCutoff = jday - 1;
+  }
+
   const attByDay = {};
   for (const r of attendanceRecords) attByDay[new Date(r.date).getUTCDate()] = r.status;
   const holidaySet = new Set(holidayDates.map((d) => new Date(d).getUTCDate()));
 
   const counts = { present: 0, absent: 0, half: 0, short: 0, paid: 0, holiday: 0, off: 0 };
+  let preJoinDays = 0;
   for (let day = 1; day <= nDays; day++) {
+    if (day <= preJoinCutoff) { preJoinDays++; continue; }
     let status;
     if (attByDay[day]) status = attByDay[day];
     else if (holidaySet.has(day)) status = 'holiday';
@@ -39,10 +48,13 @@ function computeEmployeePayroll({ employee, year, month, attendanceRecords = [],
   const excessPaid = counts.paid - coveredPaid;
   const grossLop = counts.absent * wA + counts.half * wH + counts.short * wS;
   const lopDays = round2(grossLop + excessPaid * 1);
-  const deduction = round2(lopDays * perDay);
+  const unpaidDays = round2(lopDays + preJoinDays);
+  const preJoinDeduction = round2(preJoinDays * perDay);
+  const deduction = round2(unpaidDays * perDay);
   const netPayable = round2(employee.monthlySalary - deduction);
 
   const breakdown = {
+    preJoin: preJoinDeduction,
     absent: round2(counts.absent * wA * perDay),
     half: round2(counts.half * wH * perDay),
     short: round2(counts.short * wS * perDay),
@@ -51,7 +63,9 @@ function computeEmployeePayroll({ employee, year, month, attendanceRecords = [],
 
   return {
     employeeId: employee._id, name: employee.name, grossSalary: employee.monthlySalary,
-    perDay: round2(perDay), counts, coveredPaid, excessPaid, lopDays, deduction, netPayable, breakdown,
+    joinDate: employee.joinDate || null,
+    perDay: round2(perDay), counts, coveredPaid, excessPaid,
+    preJoinDays, preJoinDeduction, lopDays, unpaidDays, deduction, netPayable, breakdown,
   };
 }
 
@@ -89,10 +103,12 @@ async function runPayroll(year, month) {
       employees: t.employees + 1,
       grossSalary: round2(t.grossSalary + r.grossSalary),
       lopDays: round2(t.lopDays + r.lopDays),
+      preJoinDays: round2(t.preJoinDays + r.preJoinDays),
+      unpaidDays: round2(t.unpaidDays + r.unpaidDays),
       deduction: round2(t.deduction + r.deduction),
       netPayable: round2(t.netPayable + r.netPayable),
     }),
-    { employees: 0, grossSalary: 0, lopDays: 0, deduction: 0, netPayable: 0 }
+    { employees: 0, grossSalary: 0, lopDays: 0, preJoinDays: 0, unpaidDays: 0, deduction: 0, netPayable: 0 }
   );
 
   return { period: { year, month }, daysInMonth: daysInMonth(year, month), rows, totals, policy };

@@ -1,7 +1,5 @@
 const { Schema, model } = require('mongoose');
 
-// A frozen result of a payroll run. Once finalized, past payslips don't change
-// even if policy or salary changes later.
 const payslipSchema = new Schema(
   {
     employeeId: { type: Schema.Types.ObjectId, ref: 'Employee', required: true },
@@ -9,8 +7,10 @@ const payslipSchema = new Schema(
     month: { type: Number, required: true, min: 1, max: 12 },
     grossSalary: Number,
     perDay: Number,
-    counts: { type: Object }, // { present, absent, half, short, paid, holiday, off }
+    counts: { type: Object },
+    preJoinDays: { type: Number, default: 0 },
     lopDays: Number,
+    unpaidDays: Number,
     deduction: Number,
     netPayable: Number,
     finalizedAt: { type: Date, default: Date.now },

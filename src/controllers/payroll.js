@@ -11,7 +11,7 @@ exports.run = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
-// POST /api/payroll/finalize?year=&month=   -> freezes payslips
+// POST /api/payroll/finalize?year=&month=
 exports.finalize = async (req, res, next) => {
   try {
     const year = Number(req.query.year);
@@ -25,7 +25,8 @@ exports.finalize = async (req, res, next) => {
           $set: {
             employeeId: r.employeeId, year, month,
             grossSalary: r.grossSalary, perDay: r.perDay, counts: r.counts,
-            lopDays: r.lopDays, deduction: r.deduction, netPayable: r.netPayable,
+            preJoinDays: r.preJoinDays, lopDays: r.lopDays, unpaidDays: r.unpaidDays,
+            deduction: r.deduction, netPayable: r.netPayable,
             finalizedAt: new Date(),
           },
         },
