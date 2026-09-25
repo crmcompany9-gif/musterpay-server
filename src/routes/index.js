@@ -15,5 +15,6 @@ router.use('/employees', requireAuth, requireAdmin, require('./employees'));
 router.use('/attendance', requireAuth, requireAdmin, require('./attendance'));
 router.use('/payroll', requireAuth, requireAdmin, require('./payroll'));
 router.use('/policy', requireAuth, requireAdmin, require('./policy'));
+router.use('/candidates', requireAuth, requireAdmin, require('./candidates'));
 
 module.exports = router;
